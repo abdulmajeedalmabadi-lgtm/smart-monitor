@@ -1,0 +1,22 @@
+{
+  "name": "smart-pool-monitor",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "db:backup": "node --env-file-if-exists=.env scripts/backup.mjs",
+    "build": "node scripts/check.mjs",
+    "db:upload": "node --env-file-if-exists=.env scripts/upload-database.mjs",
+    "iot:certificate": "node scripts/iot-certificate.mjs",
+    "verify:deployment": "node --env-file-if-exists=.env scripts/verify-deployment.mjs",
+    "secrets": "node scripts/secrets.mjs"
+  },
+  "dependencies": {
+    "@libsql/client": "0.17.0"
+  }
+}

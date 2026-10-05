@@ -1,0 +1,14 @@
+.openai/local/
+node_modules/
+data/
+backups/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+.env
+.env.*
+!.env.example
+.openai/
+wokwi/config.h
+*.zip

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "author": "Smart Monitor",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 20, "left": 20, "attrs": {} },
+    { "type": "wokwi-slide-switch", "id": "wave", "top": 20, "left": 250, "attrs": {"value":"","bounce":"0"} },
+    { "type": "wokwi-slide-switch", "id": "confirm", "top": 95, "left": 250, "attrs": {"value":"","bounce":"0"} },
+    { "type": "wokwi-potentiometer", "id": "battery", "top": 170, "left": 250, "attrs": {"value":"820"} },
+    { "type": "wokwi-led", "id": "alarm", "top": -60, "left": 240, "attrs": {"color":"red"} },
+    { "type": "wokwi-resistor", "id": "r", "top": -20, "left": 185, "attrs": {"value":"220"} },
+    { "type": "wokwi-text", "id": "label1", "top": -8, "left": 235, "attrs": {"text":"Wave sensor (right = detected)"} },
+    { "type": "wokwi-text", "id": "label2", "top": 67, "left": 235, "attrs": {"text":"Confirmation (right = detected)"} },
+    { "type": "wokwi-text", "id": "label3", "top": 150, "left": 330, "attrs": {"text":"Battery %"} }
+  ],
+  "connections": [
+    ["esp:TX0", "$serialMonitor:RX", "", []], ["esp:RX0", "$serialMonitor:TX", "", []],
+    ["wave:2", "esp:D18", "green", []], ["wave:3", "esp:GND.1", "black", []],
+    ["confirm:2", "esp:D19", "green", []], ["confirm:3", "esp:GND.1", "black", []],
+    ["battery:SIG", "esp:D34", "blue", []], ["battery:VCC", "esp:3V3", "red", []], ["battery:GND", "esp:GND.1", "black", []],
+    ["esp:D23", "r:1", "red", []], ["r:2", "alarm:A", "red", []], ["alarm:C", "esp:GND.1", "black", []]
+  ],
+  "dependencies": {}
+}
