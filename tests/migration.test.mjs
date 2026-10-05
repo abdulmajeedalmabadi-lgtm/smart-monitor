@@ -38,11 +38,3 @@ test('configured production domain works behind proxy and sends HSTS',async t=>{
   assert.equal((await fetch(url)).status,403);
   assert.equal((await fetch(url+'/api/health')).status,200);
 });
-test('login attempts are rate limited',async t=>{
-  const config=readConfig({APP_PASSWORD:'test-only-password-12345678',SESSION_SECRET:'test-only-session-secret-123456789012345'});
-  const app=await createApp({config,databasePath:':memory:'});const url=await app.listen(0);t.after(()=>app.close());
-  for(let i=0;i<11;i++){
-    const r=await fetch(url+'/api/login',{method:'POST',headers:{'Content-Type':'application/json','X-Smart-Monitor':'1'},body:'{"password":"wrong"}'});
-    assert.equal(r.status,i===10?429:401);
-  }
-});

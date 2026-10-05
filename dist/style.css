@@ -4,5 +4,11 @@
 
 /* Persistent foreground alerts stay visible without replacing an edited form. */
 #live-banner{position:fixed;bottom:82px;left:16px;right:16px;z-index:30;padding:14px 20px;border-radius:14px;box-shadow:0 5px 25px #0002;display:flex;flex-wrap:wrap;align-items:center;gap:12px;color:white}
-#live-banner[hidden]{display:none}.live-alert{background:#a92936}.connection-alert{background:#70501a}#live-banner button{border:1px solid #fff8;background:transparent;color:white;padding:8px 12px;border-radius:8px;cursor:pointer}.login-page{max-width:480px;margin:auto}.login-page form{text-align:right;display:grid;gap:12px}.login-page input{width:100%}.login-page .brand{justify-content:center}.topbar-end{flex-wrap:wrap}#login-error{color:#b3293a}
+#live-banner[hidden]{display:none}.live-alert{background:#a92936}.connection-alert{background:#70501a}#live-banner button{border:1px solid #fff8;background:transparent;color:white;padding:8px 12px;border-radius:8px;cursor:pointer}.topbar-end{flex-wrap:wrap}
 @media(min-width:900px){#live-banner{bottom:20px;left:30px;right:290px}}
+
+/* Native telephone links keep the existing contact layout and touch targets. */
+.contact-phone{color:inherit;text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+.contact-phone:hover,.contact-phone:focus-visible{text-decoration:underline}
+.contact-call{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;text-decoration:none;flex-shrink:0}
+.contact-phone:focus-visible,.contact-call:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px}

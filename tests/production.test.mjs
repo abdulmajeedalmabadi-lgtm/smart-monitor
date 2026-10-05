@@ -10,7 +10,6 @@ import { createClient } from '@libsql/client';
 import { createApp } from '../server/index.mjs';
 import { openStore } from '../server/store.mjs';
 import { readConfig } from '../server/config.mjs';
-import { createAuth } from '../server/auth.mjs';
 
 const credentials={APP_PASSWORD:'test-dashboard-password-123456',SESSION_SECRET:'test-session-secret-12345678901234567890',IOT_API_KEY:'test-device-only-key-12345678901234567890'};
 const sample=(waterDetected=false,extra={})=>({deviceId:'SM-001',sampleId:randomUUID(),source:'wokwi',waterDetected,batteryPercent:82,rssi:-51,timestamp:new Date().toISOString(),...extra});
@@ -20,37 +19,36 @@ async function fixture(t){
   const req=(path,options={})=>fetch(url+path,options);
   const post=(path,body,headers={})=>req(path,{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
   const telemetry=(body=sample(),key=credentials.IOT_API_KEY)=>post('/api/iot/telemetry',body,{Authorization:`Bearer ${key}`});
-  const login=()=>post('/api/login',{password:credentials.APP_PASSWORD},{'X-Smart-Monitor':'1'});
-  return {app,req,post,telemetry,login};
+  return {app,req,post,telemetry};
 }
 test('production refuses ephemeral SQLite, missing secrets and private/non-HTTPS origins',()=>{
   const env={NODE_ENV:'production',RENDER_EXTERNAL_URL:'https://smart-monitor.onrender.com',TURSO_DATABASE_URL:'libsql://test.turso.io',TURSO_AUTH_TOKEN:'test',...credentials};
   assert.equal(readConfig(env).host,'0.0.0.0');assert.equal(readConfig(env).publicOrigin,env.RENDER_EXTERNAL_URL);
-  for(const key of ['TURSO_DATABASE_URL','TURSO_AUTH_TOKEN','APP_PASSWORD','SESSION_SECRET','IOT_API_KEY','RENDER_EXTERNAL_URL'])assert.throws(()=>readConfig({...env,[key]:''}));
+  for(const key of ['TURSO_DATABASE_URL','TURSO_AUTH_TOKEN','IOT_API_KEY','RENDER_EXTERNAL_URL'])assert.throws(()=>readConfig({...env,[key]:''}));
   for(const origin of ['http://example.com','https://localhost','https://192.168.8.56','https://127.0.0.1','https://172.20.0.2','https://example.com/path'])assert.throws(()=>readConfig({...env,PUBLIC_ORIGIN:origin}));
   assert.throws(()=>readConfig({...env,TURSO_DATABASE_URL:'file:data.sqlite'}));
-  assert.throws(()=>readConfig({...env,APP_PASSWORD:credentials.IOT_API_KEY}));
+  assert.doesNotThrow(()=>readConfig({...env,APP_PASSWORD:'',SESSION_SECRET:''}));
 });
-test('login, cookie auth, logout, CSRF and separate device credentials',async t=>{
+test('dashboard opens and saves without a cookie even with legacy password environment configured',async t=>{
   const f=await fixture(t);
-  assert.equal((await f.req('/api/state')).status,401);
-  assert.equal((await f.req('/api/state',{headers:{Authorization:`Bearer ${credentials.IOT_API_KEY}`}})).status,401);
-  assert.equal((await f.telemetry(sample(),credentials.APP_PASSWORD)).status,401);
-  assert.equal((await f.post('/api/login',{password:credentials.APP_PASSWORD})).status,403);
-  assert.equal((await f.post('/api/login',{password:'wrong'},{'X-Smart-Monitor':'1'})).status,401);
-  const login=await f.login();assert.equal(login.status,200);
-  const setCookie=login.headers.get('set-cookie');assert.match(setCookie,/HttpOnly/);assert.match(setCookie,/SameSite=Strict/);
-  const Cookie=setCookie.split(';')[0];const state=await f.req('/api/state',{headers:{Cookie}});assert.equal(state.status,200);
-  assert.equal((await f.post('/api/pair',{}, {Cookie,Origin:'https://evil.example','X-Smart-Monitor':'1','If-Match':'0'})).status,403);
-  const logout=await f.post('/api/logout',{}, {Cookie,'X-Smart-Monitor':'1'});assert.match(logout.headers.get('set-cookie'),/Max-Age=0/);
-  assert.equal((await f.req('/api/state',{headers:{Cookie:Cookie+'tampered'}})).status,401);
-  assert.equal((await f.req('/server/config.mjs')).status,404);
-  assert.equal((await f.req('/.env')).status,404);
+  const response=await f.req('/api/state');assert.equal(response.status,200);assert.equal(response.headers.get('set-cookie'),null);
+  const state=await response.json();assert.equal(state.authRequired,false);
+  const saved=await f.post('/api/contacts',{name:'Public dashboard test',phone:'0500000000'},{'X-Smart-Monitor':'1','If-Match':String(state.revision)});
+  assert.equal(saved.status,200);assert.equal((await saved.json()).contacts.length,1);
+  assert.equal((await f.req('/api/state',{headers:{Cookie:'sm_session=obsolete'}})).status,200);
+  for(const path of ['/api/login','/api/logout'])assert.equal((await f.post(path,{})).status,404);
+  assert.equal((await f.post('/api/pair',{}, {Origin:'https://evil.example','X-Smart-Monitor':'1','If-Match':'1'})).status,403);
+  for(const path of ['/server/config.mjs','/.env'])assert.equal((await f.req(path)).status,404);
 });
-test('production secure cookie and password rotation invalidate old sessions',()=>{
-  const config={...readConfig(credentials),production:true};const auth=createAuth(config);const cookie=auth.loginCookie();
-  assert.match(cookie,/; Secure/);assert.ok(auth.authenticated({headers:{cookie}}));
-  assert.equal(createAuth({...config,password:'another-password'}).authenticated({headers:{cookie}}),false);
+test('IoT still requires its dedicated key; public state and frontend never disclose backend secrets',async t=>{
+  const f=await fixture(t);
+  assert.equal((await f.post('/api/iot/telemetry',sample())).status,401);
+  assert.equal((await f.telemetry(sample(),credentials.APP_PASSWORD)).status,401);
+  assert.equal((await f.telemetry(sample())).status,201);
+  for(const path of ['/api/state','/app.js','/']){
+    const text=await (await f.req(path)).text();
+    assert.ok(!text.includes(credentials.IOT_API_KEY));assert.ok(!text.includes('TURSO_AUTH_TOKEN'));
+  }
 });
 test('telemetry creates a persisted alert without dashboard login and retries are idempotent',async t=>{
   const f=await fixture(t),body=sample(true);

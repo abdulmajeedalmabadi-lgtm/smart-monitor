@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AppError, openStore } from './store.mjs';
 import { readConfig } from './config.mjs';
-import { createAuth, equalSecret } from './auth.mjs';
+import { equalSecret } from './auth.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const assets = new Map([
@@ -27,8 +27,7 @@ async function readBody(req,limit=512*1024) {
 export async function createApp(options={}) {
   const config = options.config || readConfig({});
   const store = options.store || await openStore(options.databasePath || config.databasePath, {url:config.databaseUrl,authToken:config.databaseToken});
-  const auth = createAuth(config);
-  let loginAttempts=0,loginWindow=Date.now(),iotCount=0,iotWindow=Date.now();
+  let iotCount=0,iotWindow=Date.now();
   const server = createServer(async(req,res)=>{
     try{
       if(config.production)res.setHeader('Strict-Transport-Security','max-age=31536000');
@@ -55,24 +54,15 @@ export async function createApp(options={}) {
         const result=await store.ingestTelemetry(body);
         return json(res,result.duplicate?200:201,result);
       }
-      if(path==='/api/login'&&req.method==='POST'){
-        if(req.headers['x-smart-monitor']!=='1')throw new AppError(403,'الطلب غير مسموح');
-        if(Date.now()-loginWindow>60000){loginWindow=Date.now();loginAttempts=0;}
-        if(++loginAttempts>10)throw new AppError(429,'محاولات كثيرة؛ انتظر دقيقة');
-        const body=await readBody(req,2048);
-        if(config.password&&!equalSecret(body?.password||'',config.password))throw new AppError(401,'كلمة المرور غير صحيحة');
-        return json(res,200,{ok:true},{'Set-Cookie':auth.loginCookie()});
-      }
+      if(path==='/api/login'||path==='/api/logout')throw new AppError(404,'المسار غير موجود');
       if(path.startsWith('/api/')){
-        if(!auth.authenticated(req))throw new AppError(401,'سجّل الدخول لفتح لوحة المراقبة');
-        if(path==='/api/state'&&req.method==='GET')return json(res,200,{...await store.getState(),authRequired:Boolean(config.password)});
+        if(path==='/api/state'&&req.method==='GET')return json(res,200,{...await store.getState(),authRequired:false});
         if(!['POST','PATCH','DELETE'].includes(req.method))throw new AppError(405,'طريقة الطلب غير مدعومة');
         if(req.headers['x-smart-monitor']!=='1')throw new AppError(403,'الطلب غير مسموح');
-        if(path==='/api/logout'&&req.method==='POST')return json(res,200,{ok:true},{'Set-Cookie':auth.logoutCookie()});
         const revisionHeader=req.headers['if-match'];
         const revision=typeof revisionHeader==='string'&&/^\d+$/.test(revisionHeader)?Number(revisionHeader):NaN;
         const body=await readBody(req);
-        return json(res,200,{...await store.mutate(req.method,path,body,revision),authRequired:Boolean(config.password)});
+        return json(res,200,{...await store.mutate(req.method,path,body,revision),authRequired:false});
       }
       if(!['GET','HEAD'].includes(req.method))throw new AppError(405,'طريقة الطلب غير مدعومة');
       if(path==='/favicon.ico'){res.writeHead(204,headers);return res.end();}

@@ -14,7 +14,7 @@ Copy-Item .env.example .env
 npm start
 ```
 
-افتح `http://localhost:5173`. استخدم هذا العنوان للتطوير فقط. لا حاجة لأداة بناء للواجهة؛ ملفات `dist/` هي الواجهة الحالية المحفوظة. قاعدة التطوير SQLite في `data/monitor.sqlite`. إضافة APP_PASSWORD وSESSION_SECRET في .env تفعّل تسجيل الدخول محليًا. إضافة IOT_API_KEY تفعّل استقبال القياسات.
+افتح `http://localhost:5173`. استخدم هذا العنوان للتطوير فقط. لا حاجة لأداة بناء للواجهة؛ ملفات `dist/` هي الواجهة الحالية المحفوظة. قاعدة التطوير SQLite في `data/monitor.sqlite`. الموقع يفتح مباشرة دون كلمة مرور. إضافة IOT_API_KEY تفعّل استقبال القياسات.
 
 ## الإنتاج
 
@@ -32,7 +32,7 @@ npm start
 | `npm run build` | فحص JavaScript وتجهيز الأصول الموجودة للنشر |
 | `npm start` | تشغيل Node وقراءة .env إن وجد |
 | `npm test` | اختبارات API والبيانات والإنتاج والترحيلات |
-| `npm run secrets` | توليد كلمات مرور/مفاتيح جديدة، تحفظها بشكل خاص |
+| `npm run secrets` | توليد مفتاح IoT جديد، تحفظها بشكل خاص |
 | `npm run db:backup` | نسخ SQLite المحلي |
 | `npm run db:upload` | نقل قاعدة محلية إلى Turso فارغة دون تغيير الأصل |
 | `npm run iot:certificate -- https://YOUR-SERVICE.onrender.com` | استخراج CA موثوقة لبرنامج ESP32 |

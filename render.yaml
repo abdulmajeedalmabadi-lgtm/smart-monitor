@@ -21,9 +21,5 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
-      - key: APP_PASSWORD
-        sync: false
-      - key: SESSION_SECRET
-        generateValue: true
       - key: IOT_API_KEY
         sync: false

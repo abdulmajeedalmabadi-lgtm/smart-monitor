@@ -3,12 +3,11 @@ const icon=(name,cls='')=>`<svg class="icon ${cls}" viewBox="0 0 24 24" fill="no
 const escapeHTML=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const initial={paired:false,pool:'المسبح الرئيسي',enabled:true,events:[],contacts:[],settings:{phone:true,sound:true,escalate:true}};
 let legacy;try{legacy=JSON.parse(localStorage.getItem('smart-monitor-v1'));}catch{}
-let state={...initial},page='welcome',step=0,filter='all',pairTimer,busy=false,ready=false,importDismissed=false;
+let state={...initial},page='home',step=0,filter='all',pairTimer,busy=false,ready=false,importDismissed=false;
 const app=document.querySelector('#app'),modal=document.querySelector('#modal');
 async function api(path,method='GET',body){
   const response=await fetch(path,{method,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(90000),headers:method==='GET'?{}:{'Content-Type':'application/json','X-Smart-Monitor':'1','If-Match':String(state.revision)},body:method==='GET'?undefined:JSON.stringify(body||{})});
   let data;try{data=await response.json();}catch{throw new Error('الخادم لا يدعم قاعدة البيانات. شغّل الموقع باستخدام npm start.');}
-  if(response.status===401&&path!=='/api/login'){ready=false;modal.close();showLogin();}
   if(!response.ok){const error=new Error(data.error||'تعذر تنفيذ الطلب');error.status=response.status;throw error;}
   return data;
 }
@@ -28,8 +27,8 @@ async function change(path,method,body,message,after){
 }
 async function load(){
   app.innerHTML='<main class="connection-page"><h1>المراقب الذكي</h1><p role="status">جارٍ تحميل بيانات المسبح…</p></main>';
-  try{state=await api('/api/state');ready=true;page=state.paired?'home':'welcome';render();}
-  catch(error){if(error.status===401){showLogin();return;}ready=false;app.innerHTML=`<main class="connection-page"><h1>تعذر الاتصال بالخادم</h1><p>${escapeHTML(error.message)}</p><p>قد يحتاج الخادم المجاني إلى دقيقة للاستيقاظ. تحقق من اتصال الإنترنت ثم أعد المحاولة.</p><button class="primary" data-action="retry">إعادة المحاولة</button></main>`;}
+  try{state=await api('/api/state');ready=true;page='home';render();}
+  catch(error){ready=false;app.innerHTML=`<main class="connection-page"><h1>تعذر الاتصال بالخادم</h1><p>${escapeHTML(error.message)}</p><p>قد يحتاج الخادم المجاني إلى دقيقة للاستيقاظ. تحقق من اتصال الإنترنت ثم أعد المحاولة.</p><button class="primary" data-action="retry">إعادة المحاولة</button></main>`;}
 }
 function toast(message){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
 const button=(text,action,cls='primary',glyph='arrow')=>`<button class="${cls}" data-action="${action}">${text}${icon(glyph)}</button>`;
@@ -39,24 +38,70 @@ function intro(){const content=[`<span class="eyebrow">أمان ذكي. خصوص
 function pair(){return `<main class="pair-page">${brand()}<span class="demo-tag">ربط تجريبي</span><div class="pair-content"><div class="pair-orbit">${icon('wifi')}</div><h1>جارٍ تجهيز لوحة المسبح</h1><p>نحاكي خطوات الاتصال لتجربة الموقع.<br>لا يتم البحث عن أجهزة حقيقية.</p><div class="pair-steps"><span>١. الجهاز</span><span>٢. الاتصال</span><span>٣. جاهز</span></div>${button('إلغاء','cancel-pair','secondary','arrow')}</div>${disclaimer()}</main>`;}
 const currentAlert=()=>state.events.find(e=>!e.acknowledged);
 const navItems=[['home','home','الرئيسية'],['alerts','bell','التنبيهات'],['history','clock','السجل'],['settings','settings','الإعدادات']];
-function shell(content,title,sub){const alert=currentAlert();return `<div class="app-layout"><aside class="sidebar">${brand()}<nav aria-label="التنقل الرئيسي">${navItems.map(([key,glyph,label])=>`<button data-page="${key}" class="nav-item ${page===key?'active':''}" ${page===key?'aria-current="page"':''}>${icon(glyph)}<span>${label}</span>${key==='alerts'&&alert?'<b class="badge">1</b>':''}</button>`).join('')}</nav><div class="sidebar-bottom"><div class="privacy">${icon('shield')}<strong>خصوصيتك محفوظة</strong><p>مراقبة بالحساسات<br>بدون كاميرات</p></div><span class="demo-tag">${sourceLabel(state.device.mode)}</span></div></aside><div class="main-shell"><header class="topbar"><div class="mobile-brand">${brand()}</div><div class="topbar-desktop"><span class="live-dot"></span> ${state.enabled?'المراقبة نشطة':'المراقبة متوقفة'}</div><div class="topbar-end"><span class="demo-tag">${deviceConnection()}</span><button class="icon-button" data-page="alerts" aria-label="عرض التنبيهات">${icon('bell')}${alert?'<i></i>':''}</button><button class="text-button" data-action="enable-sound" aria-label="تفعيل الصوت على هذا الجهاز">${icon("sound")}</button>${state.authRequired?'<button class="text-button" data-action="logout">خروج</button>':""}</div></header><main class="main-content"><div class="page-heading"><div><span class="eyebrow">سلامة مسبحك</span><h1>${title}</h1><p>${sub}</p></div>${page==='home'?button('إدارة الجهاز','device','secondary','settings'):''}</div>${content}<div class="bottom-notice">${disclaimer()}</div></main><nav class="mobile-nav" aria-label="التنقل للجوال">${navItems.map(([key,glyph,label])=>`<button class="${page===key?'active':''}" data-page="${key}" ${page===key?'aria-current="page"':''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav></div></div>`;}
+function shell(content,title,sub){const alert=currentAlert();return `<div class="app-layout"><aside class="sidebar">${brand()}<nav aria-label="التنقل الرئيسي">${navItems.map(([key,glyph,label])=>`<button data-page="${key}" class="nav-item ${page===key?'active':''}" ${page===key?'aria-current="page"':''}>${icon(glyph)}<span>${label}</span>${key==='alerts'&&alert?'<b class="badge">1</b>':''}</button>`).join('')}</nav><div class="sidebar-bottom"><div class="privacy">${icon('shield')}<strong>خصوصيتك محفوظة</strong><p>مراقبة بالحساسات<br>بدون كاميرات</p></div><span class="demo-tag">${sourceLabel(state.device.mode)}</span></div></aside><div class="main-shell"><header class="topbar"><div class="mobile-brand">${brand()}</div><div class="topbar-desktop"><span class="live-dot"></span> ${state.enabled?'المراقبة نشطة':'المراقبة متوقفة'}</div><div class="topbar-end"><span class="demo-tag">${deviceConnection()}</span><button class="icon-button" data-page="alerts" aria-label="عرض التنبيهات">${icon('bell')}${alert?'<i></i>':''}</button><button class="text-button" data-action="enable-sound" aria-label="تفعيل الصوت على هذا الجهاز" aria-pressed="${soundEnabled}" title="${soundEnabled?'الصوت مفعّل لهذه الصفحة':'تفعيل الصوت'}">${icon("sound")}</button></div></header><main class="main-content"><div class="page-heading"><div><span class="eyebrow">سلامة مسبحك</span><h1>${title}</h1><p>${sub}</p></div>${page==='home'?button('إدارة الجهاز','device','secondary','settings'):''}</div>${content}<div class="bottom-notice">${disclaimer()}</div></main><nav class="mobile-nav" aria-label="التنقل للجوال">${navItems.map(([key,glyph,label])=>`<button class="${page===key?'active':''}" data-page="${key}" ${page===key?'aria-current="page"':''}>${icon(glyph)}<span>${label}</span></button>`).join('')}</nav></div></div>`;}
 function poolVisual(alert){return `<div class="pool-scene ${alert?'danger':''}"><div class="pool-ripple r1"></div><div class="pool-ripple r2"></div><div class="pool-ripple r3"></div><span class="sensor">${icon('device')}<i></i></span><span class="pool-caption">${icon('wave')} ${escapeHTML(state.pool)}</span><span class="pool-tag">${alert?'تنبيه نشط':state.enabled?'متابعة المسبح':'المراقبة متوقفة'}</span></div>`;}
 function home(){const alert=currentAlert();return shell(`<div class="dashboard-grid"><section class="card pool-card"><div class="section-head"><h2>نظرة على المسبح</h2><span class="muted">بدون كاميرا</span></div>${poolVisual(alert)}<div class="metrics"><div>${icon('wave')}<small>حالة المسبح</small><strong class="${alert?'red':'teal'}">${alert?'دخول جسم':state.enabled?(state.device.online?(state.device.waterDetected?'اضطراب الماء':'لا اضطراب مرصود'):'لا توجد قراءة حديثة'):'غير مراقب'}</strong></div><div>${icon('wifi')}<small>اتصال الجهاز</small><strong>${deviceConnection()}</strong></div><div>${icon('device')}<small>البطارية</small><strong dir="ltr">${state.device.batteryPercent===null?"—":Math.round(state.device.batteryPercent)+"%"}</strong></div></div></section><section class="card status-card ${alert?'alert-status':''}"><div class="section-head"><h2>حالة المراقبة</h2><span class="status-pill ${alert?'danger':''}">${alert?'يتطلب التحقق':state.enabled?'نشطة':'متوقفة'}</span></div><div class="status-symbol">${icon(alert?'alert':'shield')}</div><h2>${alert?'تم اكتشاف دخول جسم إلى الماء':state.enabled?(state.device.online?'متابعة قراءات الجهاز':'بانتظار قراءات الجهاز'):'المراقبة متوقفة'}</h2><p>${alert?sourceLabel(alert.source):'تعرض اللوحة آخر قراءة مستلمة؛ تحقق من اتصال الجهاز.'}</p>${alert?button('عرض تفاصيل التنبيه','detail','danger-button','arrow'):button(state.enabled?'إيقاف المراقبة':'تشغيل المراقبة','toggle','secondary','power')}<div class="status-foot">${icon('lock')} حساسات فقط، بدون كاميرات</div></section><section class="card device-card"><div class="section-head"><h2>مستشعر المسبح الرئيسي</h2><span class="status-pill">${deviceConnection()}</span></div><div class="device-row"><span class="tile">${icon('device')}</span><div><strong>المراقب الذكي</strong><p>${sourceLabel(state.device.mode)} · ${escapeHTML(state.device.serial)}</p></div><button class="text-button" data-action="device">إدارة ${icon('arrow')}</button></div><div class="device-summary"><span>${icon('check')} ${sourceLabel(state.device.mode)}</span><span>${icon('wifi')} ${deviceConnection()}</span></div></section><section class="card activity-card"><div class="section-head"><h2>آخر الأحداث</h2><button class="text-button" data-page="history">عرض الكل</button></div>${state.events.length?eventRow(state.events[0]):`<div class="empty-small">${icon('clock')}<div><strong>لا توجد تنبيهات حتى الآن</strong><p>تظهر الأحداث هنا عند تجربة محاكاة التنبيه.</p></div></div>`}</section><section class="demo-panel"><span class="tile">${icon('alert')}</span><div><h3>جرّب سيناريو التنبيه</h3><p>حاكِ دخول جسم للماء لاستكشاف تفاصيل التنبيه والاستجابة.</p></div>${button('محاكاة تنبيه','simulate','secondary','plus')}</section></div>`,'أهلًا بك في المراقب الذكي','كل ما تحتاجه لمتابعة مسبحك، في مكان واحد.');}
 function eventRow(e){return `<button class="event-row" data-event="${e.id}"><span class="tile ${e.acknowledged?'':'red-tile'}">${icon(e.acknowledged?'check':'alert')}</span><div><strong>دخول جسم إلى الماء</strong><p>${escapeHTML(e.pool)} · ${new Date(e.time).toLocaleString('ar-SA',{dateStyle:'short',timeStyle:'short'})}</p></div><span class="status-pill ${e.acknowledged?'':'danger'}">${e.acknowledged?'تم التحقق':'يتطلب التحقق'}</span>${icon('arrow')}</button>`;}
 function eventsPage(){const list=state.events.filter(e=>filter==='all'||(filter==='pending'?!e.acknowledged:e.acknowledged));return shell(`<section class="card events-card"><div class="section-head"><h2>${page==='history'?'سجل الأحداث':'تنبيهات المسبح'}</h2><span class="muted">${state.events.length} حدث</span></div><div class="filters">${[['all','الكل'],['pending','بانتظار التحقق'],['done','تم التحقق']].map(([k,v])=>`<button class="${filter===k?'active':''}" data-filter="${k}">${v}</button>`).join('')}</div>${list.length?list.map(eventRow).join(''):`<div class="empty-state">${icon('bell')}<h2>لا توجد ${filter==='all'?'تنبيهات':'أحداث مطابقة'}</h2><p>ستظهر التنبيهات التجريبية هنا عند محاكاة حدث.</p>${button('محاكاة تنبيه','simulate','secondary','plus')}</div>`}</section>`,page==='history'?'سجل المسبح':'التنبيهات',page==='history'?'راجع الأحداث السابقة وحالة التحقق منها.':'تابع التنبيهات واتخذ الإجراء المناسب.');}
-function settings(){return shell(`<div class="settings-grid"><section class="card"><div class="section-head"><h2>إعدادات التنبيهات</h2>${icon('bell')}</div>${[['phone','phone','إشعارات الجوال','تنبيه ظاهر في الموقع أثناء فتحه على الجوال.'],['sound','sound','التنبيه الصوتي','صوت داخل الصفحة المفتوحة بعد تفعيله على هذا الجهاز.'],['escalate','users','تنبيه جهات الاتصال','حفظ التفضيل؛ لا يتم إرسال رسائل في وضع العرض.']].map(([key,glyph,title,desc])=>`<div class="setting-row"><span class="tile">${icon(glyph)}</span><div><strong>${title}</strong><p>${desc}</p></div><button class="switch" role="switch" aria-label="${title}" aria-checked="${state.settings[key]}" data-setting="${key}"><span></span></button></div>`).join('')}<div class="info-note">التنبيهات الحية تعمل أثناء فتح الصفحة واتصالها بالإنترنت. فعّل الصوت من الشريط العلوي. لا توجد رسائل SMS أو إشعارات عند إغلاق الموقع؛ جهات الاتصال محفوظة فقط.</div></section><section class="card"><div class="section-head"><h2>جهات الاتصال</h2><button class="text-button" data-action="add-contact">${icon('plus')} إضافة</button></div>${state.contacts.length?state.contacts.map((c,i)=>`<div class="contact-row"><span class="avatar">${escapeHTML(c.name.slice(0,1))}</span><div><strong>${escapeHTML(c.name)}</strong><p dir="ltr">${escapeHTML(c.phone)}</p></div><button class="text-button" data-remove="${c.id}" aria-label="حذف ${escapeHTML(c.name)}">حذف</button></div>`).join(''):`<div class="empty-small">${icon('users')}<div><strong>أضف جهة اتصال</strong><p>احفظ جهات التواصل في قاعدة البيانات.</p></div></div>`}</section><section class="card"><div class="section-head"><h2>الجهاز والمسبح</h2>${icon('device')}</div><form id="pool-form"><label for="pool-name">اسم المسبح</label><input id="pool-name" name="pool" value="${escapeHTML(state.pool)}" required maxlength="50"><button class="primary" type="submit">حفظ التغييرات ${icon('check')}</button></form></section><section class="card privacy-card">${icon('shield')}<h2>أمان ذكي يحفظ الخصوصية</h2><p>الفكرة تعتمد على حساسات ترصد اضطراب الماء وتؤكد دخول جسم للمسبح، بدون تصوير أو كاميرات.</p><span class="demo-tag">البيانات محفوظة في قاعدة البيانات</span></section></div>`,'الإعدادات','اضبط تفضيلات المراقبة وجهات التواصل.');}
+function settings(){return shell(`<div class="settings-grid"><section class="card"><div class="section-head"><h2>إعدادات التنبيهات</h2>${icon('bell')}</div>${[['phone','phone','إشعارات الجوال','تنبيه ظاهر في الموقع أثناء فتحه على الجوال.'],['sound','sound','التنبيه الصوتي','صوت داخل الصفحة المفتوحة بعد تفعيله على هذا الجهاز.'],['escalate','users','تنبيه جهات الاتصال','حفظ التفضيل؛ لا يتم إرسال رسائل في وضع العرض.']].map(([key,glyph,title,desc])=>`<div class="setting-row"><span class="tile">${icon(glyph)}</span><div><strong>${title}</strong><p>${desc}</p></div><button class="switch" role="switch" aria-label="${title}" aria-checked="${state.settings[key]}" data-setting="${key}"><span></span></button></div>`).join('')}<div class="info-note">التنبيهات الحية تعمل أثناء فتح الصفحة واتصالها بالإنترنت. فعّل الصوت من الشريط العلوي. لا توجد رسائل SMS أو إشعارات عند إغلاق الموقع؛ جهات الاتصال محفوظة فقط.</div></section><section class="card"><div class="section-head"><h2>جهات الاتصال</h2><button class="text-button" data-action="add-contact">${icon('plus')} إضافة</button></div>${state.contacts.length?state.contacts.map((c,i)=>`<div class="contact-row"><span class="avatar">${escapeHTML(c.name.slice(0,1))}</span><div><strong>${escapeHTML(c.name)}</strong><p dir="ltr"><a class="contact-phone" href="tel:${escapeHTML(c.phone)}" aria-label="اتصال بـ ${escapeHTML(c.name)} على ${escapeHTML(c.phone)}">${escapeHTML(c.phone)}</a></p></div><a class="text-button contact-call" href="tel:${escapeHTML(c.phone)}" aria-label="اتصال بـ ${escapeHTML(c.name)}">${icon('phone')}</a><button class="text-button" data-remove="${c.id}" aria-label="حذف ${escapeHTML(c.name)}">حذف</button></div>`).join(''):`<div class="empty-small">${icon('users')}<div><strong>أضف جهة اتصال</strong><p>احفظ جهات التواصل في قاعدة البيانات.</p></div></div>`}</section><section class="card"><div class="section-head"><h2>الجهاز والمسبح</h2>${icon('device')}</div><form id="pool-form"><label for="pool-name">اسم المسبح</label><input id="pool-name" name="pool" value="${escapeHTML(state.pool)}" required maxlength="50"><button class="primary" type="submit">حفظ التغييرات ${icon('check')}</button></form></section><section class="card privacy-card">${icon('shield')}<h2>أمان ذكي يحفظ الخصوصية</h2><p>الفكرة تعتمد على حساسات ترصد اضطراب الماء وتؤكد دخول جسم للمسبح، بدون تصوير أو كاميرات.</p><span class="demo-tag">البيانات محفوظة في قاعدة البيانات</span></section></div>`,'الإعدادات','اضبط تفضيلات المراقبة وجهات التواصل.');}
 function render(){
   const canImport=legacy&&typeof legacy==='object'&&!importDismissed&&state.revision===0&&!state.legacyImported;
   app.innerHTML=(canImport?`<aside class="migration-banner"><span>لديك بيانات من النسخة السابقة في هذا المتصفح.</span><button class="text-button" data-action="import">نقلها إلى قاعدة البيانات</button><button class="text-button" data-action="dismiss-import">لاحقًا</button></aside>`:'')+(page==='welcome'?intro():page==='pair'?pair():page==='home'?home():page==='settings'?settings():eventsPage());
   setBusy(busy);updateLiveBanner();
 }
 function showModal(body){modal.innerHTML=`<button class="modal-close icon-button" data-action="close-modal" aria-label="إغلاق">×</button>${body}`;modal.querySelector('h2')?.setAttribute('id','dialog-title');modal.setAttribute('aria-labelledby','dialog-title');modal.showModal();}
-function detail(id){const e=state.events.find(x=>x.id===id)||currentAlert();if(!e)return;showModal(`<span class="detail-icon">${icon('alert')}</span><span class="eyebrow">${sourceLabel(e.source)}</span><h2>دخول جسم إلى الماء</h2><p>تحقق من المسبح مباشرة عند تلقي تنبيه حقيقي.</p><dl><div><dt>المسبح</dt><dd>${escapeHTML(e.pool)}</dd></div><div><dt>الوقت</dt><dd>${new Date(e.time).toLocaleString('ar-SA')}</dd></div><div><dt>حالة التنبيه</dt><dd>${e.acknowledged?'تم التحقق':'بانتظار التحقق'}</dd></div><div><dt>مصدر البيانات</dt><dd>${sourceLabel(e.source)}</dd></div></dl><div class="action-guide"><h3>الإجراء الموصى به</h3><ol><li>توجّه إلى المسبح فورًا.</li><li>تحقق من سلامة الموجودين.</li><li>عند وجود حالة طارئة، اطلب المساعدة.</li></ol></div>${!e.acknowledged?`<button class="danger-button" data-ack="${e.id}">تم التحقق من المسبح ${icon('check')}</button>`:button('إغلاق','close-modal','secondary','check')}`);}
-function sound(){try{audioContext ||= new (window.AudioContext||window.webkitAudioContext)();audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.connect(gain);gain.connect(audioContext.destination);osc.frequency.value=740;gain.gain.value=.07;osc.start();gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.5);osc.stop(audioContext.currentTime+.5);}catch{}}
+function detail(id){const e=state.events.find(x=>x.id===id)||currentAlert();if(!e)return;silenceDangerAlarm();showModal(`<span class="detail-icon">${icon('alert')}</span><span class="eyebrow">${sourceLabel(e.source)}</span><h2>دخول جسم إلى الماء</h2><p>تحقق من المسبح مباشرة عند تلقي تنبيه حقيقي.</p><dl><div><dt>المسبح</dt><dd>${escapeHTML(e.pool)}</dd></div><div><dt>الوقت</dt><dd>${new Date(e.time).toLocaleString('ar-SA')}</dd></div><div><dt>حالة التنبيه</dt><dd>${e.acknowledged?'تم التحقق':'بانتظار التحقق'}</dd></div><div><dt>مصدر البيانات</dt><dd>${sourceLabel(e.source)}</dd></div></dl><div class="action-guide"><h3>الإجراء الموصى به</h3><ol><li>توجّه إلى المسبح فورًا.</li><li>تحقق من سلامة الموجودين.</li><li>عند وجود حالة طارئة، اطلب المساعدة.</li></ol></div>${!e.acknowledged?`<button class="danger-button" data-ack="${e.id}">تم التحقق من المسبح ${icon('check')}</button>`:button('إغلاق','close-modal','secondary','check')}`);}
+// One looping audio source avoids timer drift and duplicate loops on repeated polling.
+function createAlarmBuffer(context){
+  const duration=3,buffer=context.createBuffer(1,context.sampleRate*duration,context.sampleRate),samples=buffer.getChannelData(0);
+  for(let i=0;i<samples.length;i++){
+    const t=i/context.sampleRate,beat=t%1;
+    if(beat>=.65)continue;
+    const envelope=Math.min(1,beat/.015,(.65-beat)/.025);
+    samples[i]=.32*envelope*(Math.sin(2*Math.PI*850*t)+.35*Math.sin(2*Math.PI*1700*t));
+  }
+  return buffer;
+}
+function stopDangerAlarm(){
+  const source=alarmSource;alarmSource=null;alarmAlertId='';
+  if(source){try{source.stop();}catch{}source.disconnect();}
+}
+function silenceDangerAlarm(){
+  const alert=currentAlert();if(alert)silencedAlerts.add(alert.id);
+  stopDangerAlarm();
+}
+function syncDangerAlarm(){
+  const alert=currentAlert();
+  // Existing unacknowledged alerts are the API's DANGER state; no schema change.
+  if(!ready||!alert||!soundEnabled||!state.settings.sound||silencedAlerts.has(alert.id)){
+    stopDangerAlarm();return;
+  }
+  if(alarmSource&&alarmAlertId===alert.id)return;
+  stopDangerAlarm();
+  if(!audioContext||audioContext.state!=='running')return;
+  const source=audioContext.createBufferSource();
+  source.buffer=alarmBuffer ||= createAlarmBuffer(audioContext);
+  source.loop=true;source.connect(audioContext.destination);
+  alarmSource=source;alarmAlertId=alert.id;
+  source.start();
+}
+async function enableSound(){
+  try{
+    audioContext ||= new (window.AudioContext||window.webkitAudioContext)();
+    // Called directly from the button gesture, before the first await (mobile autoplay).
+    await audioContext.resume();
+    if(audioContext.state!=='running')throw new Error('Audio is suspended');
+    soundEnabled=true;syncDangerAlarm();
+    document.querySelectorAll('[data-action="enable-sound"]').forEach(button=>{
+      button.setAttribute('aria-pressed','true');button.title='الصوت مفعّل لهذه الصفحة';
+    });
+    toast(state.settings.sound?'تم تفعيل الصوت لهذه الصفحة':'تم تجهيز الصوت؛ فعّل التنبيه الصوتي من الإعدادات');
+  }catch{soundEnabled=false;stopDangerAlarm();toast('تعذر تفعيل الصوت؛ اضغط تفعيل الصوت مرة أخرى وتحقق من إعدادات المتصفح.');}
+}
 async function simulate(){
   if(!state.enabled){toast('شغّل المراقبة أولًا');return;}
   if(currentAlert()){detail();return;}
-  await change('/api/events/simulate','POST',{},'تم حفظ تنبيه تجريبي في قاعدة البيانات',()=>{page='home';if(state.settings.sound)sound();});
+  await change('/api/events/simulate','POST',{},'تم حفظ تنبيه تجريبي في قاعدة البيانات',()=>{page='home';});
 }
 async function toggle(){
   if(state.enabled&&currentAlert()){toast('تحقق من التنبيه النشط قبل إيقاف المراقبة');return;}
@@ -80,10 +125,9 @@ async function handleClick(event){
   if(el.dataset.remove){await change('/api/contacts/'+encodeURIComponent(el.dataset.remove),'DELETE',{},'تم حذف جهة الاتصال');return;}
   if(el.dataset.ack){await change('/api/events/'+encodeURIComponent(el.dataset.ack)+'/ack','POST',{},'تم حفظ التحقق من التنبيه',()=>modal.close());return;}
   switch(el.dataset.action){
-    case'enable-sound':soundEnabled=true;sound();toast('تم تفعيل الصوت لهذه الصفحة');break;
-    case'logout':await api('/api/logout','POST',{});ready=false;showLogin();break;
+    case'enable-sound':await enableSound();break;
     case'retry':await load();break;
-    case'import':await change('/api/import','POST',legacy,'تم نقل بياناتك السابقة؛ بقيت النسخة الأصلية في المتصفح',()=>{page=state.paired?'home':'welcome';});break;
+    case'import':await change('/api/import','POST',legacy,'تم نقل بياناتك السابقة؛ بقيت النسخة الأصلية في المتصفح',()=>{page='home';});break;
     case'dismiss-import':importDismissed=true;render();break;
     case'intro-next':step=Math.min(2,step+1);render();window.scrollTo(0,0);break;
     case'how':step=1;render();window.scrollTo(0,0);break;
@@ -104,7 +148,6 @@ async function handleClick(event){
 async function handleSubmit(event){
   event.preventDefault();if(busy)return;
   const data=new FormData(event.target);
-  if(event.target.id==='login-form'){setBusy(true);try{await api('/api/login','POST',{password:data.get('password')});await load();}catch(error){document.querySelector('#login-error').textContent=error.message;}finally{setBusy(false);}return;}
   if(event.target.id==='pool-form'){
     const name=data.get('pool').trim();if(!name){toast('أدخل اسم المسبح');return;}
     await change('/api/pool','PATCH',{name},'تم حفظ اسم المسبح');
@@ -121,13 +164,10 @@ document.addEventListener('click',event=>{handleClick(event).catch(reportUnexpec
 document.addEventListener('submit',event=>{handleSubmit(event).catch(reportUnexpected);});
 modal.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
 modal.addEventListener('click',e=>{if(!busy&&e.target===modal){const r=modal.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)modal.close();}});
-let polling=false,soundEnabled=false,audioContext,lastAnnounced='',connectionLost=false;
+let polling=false,soundEnabled=false,audioContext,alarmBuffer,alarmSource=null,alarmAlertId='',connectionLost=false;
+const silencedAlerts=new Set();
 function sourceLabel(source){return source==='wokwi'?'محاكاة ESP32 عبر Wokwi':source==='esp32'?'جهاز ESP32':source==='legacy_import'?'بيانات مستوردة':'محاكاة الواجهة';}
 function deviceConnection(){return state.device.mode==='simulation'?'محاكاة الواجهة':state.device.online?'متصل':'لا توجد قراءة حديثة';}
-function showLogin(){
-  document.querySelector('#live-banner')?.remove();
-  app.innerHTML=`<main class="connection-page login-page">${brand()}<h1>متابعة المسبح</h1><p>أدخل كلمة مرور لوحة المراقبة.</p><form id="login-form"><label for="password">كلمة المرور</label><input id="password" name="password" type="password" autocomplete="current-password" required><p id="login-error" role="alert"></p><button class="primary" type="submit">دخول</button></form></main>`;
-}
 function updateLiveBanner(){
   let banner=document.querySelector('#live-banner');
   if(!banner){banner=document.createElement('aside');banner.id='live-banner';banner.setAttribute('role','alert');document.body.append(banner);}
@@ -135,7 +175,7 @@ function updateLiveBanner(){
   banner.hidden=!alert&&!connectionLost;
   banner.className=alert?'live-alert':'connection-alert';
   banner.innerHTML=alert?`<strong>تنبيه: دخول جسم إلى الماء</strong> <span>${sourceLabel(alert.source)}</span> <button data-event="${escapeHTML(alert.id)}">عرض التنبيه</button>`:connectionLost?'انقطع الاتصال بالخادم؛ القراءات المعروضة قديمة. جارٍ إعادة المحاولة…':'';
-  if(alert&&lastAnnounced!==alert.id){lastAnnounced=alert.id;if(soundEnabled&&state.settings.sound)sound();}
+  syncDangerAlarm();
 }
 async function poll(){
   if(!ready||busy||polling||document.hidden)return;
@@ -148,9 +188,11 @@ async function poll(){
     if(page==='welcome'&&state.paired)page='home';
     if(changed&&!modal.open&&page!=='settings'&&page!=='pair')render();
     updateLiveBanner();
-  }catch(error){if(error.status!==401){connectionLost=true;updateLiveBanner();}}
+  }catch(error){connectionLost=true;updateLiveBanner();}
   finally{polling=false;}
 }
+window.addEventListener('pagehide',stopDangerAlarm);
+window.addEventListener('pageshow',()=>{if(ready)syncDangerAlarm();});
 window.addEventListener('focus',poll);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
 setInterval(poll,5000);

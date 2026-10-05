@@ -21,10 +21,8 @@ Telemetry older than 7 days is pruned on ingestion; alert history and contacts r
 | Route | Authentication / behavior |
 |---|---|
 | GET /api/health | Public; SELECT 1 checks DB; 200 ok or 503 unavailable |
-| POST /api/login | JSON password plus X-Smart-Monitor: 1; returns session cookie |
-| POST /api/logout | Session plus X-Smart-Monitor: 1; clears browser cookie |
-| GET /api/state | Session required when APP_PASSWORD is set |
-| POST /api/pair | Session, X-Smart-Monitor: 1, If-Match; UI demo pairing |
+| GET /api/state | Public dashboard; no password or session |
+| POST /api/pair | X-Smart-Monitor: 1, If-Match; UI demo pairing |
 | PATCH /api/pool | Same; `{ "name": "..." }` |
 | PATCH /api/monitoring | Same; `{ "enabled": true }` |
 | PATCH /api/settings | Same; boolean phone/sound/escalate preferences |
@@ -41,6 +39,6 @@ Example telemetry body (use current UTC timestamp and a fresh sample ID):
 {"deviceId":"SM-001","sampleId":"unique-uuid","source":"wokwi","waterDetected":true,"batteryPercent":82,"rssi":-51,"timestamp":"2026-10-05T12:00:00.000Z"}
 ```
 
-`source` is wokwi or esp32. waterDetected must be boolean; batteryPercent finite number 0..100; rssi integer -120..0. JSON payload limit is 8 KiB for telemetry; authenticated device traffic is capped at 120 requests/minute per process. The login limit is 10 attempts/minute per process. Restarting the service resets these in-memory limits; device deduplication lives in the database and persists.
+`source` is wokwi or esp32. waterDetected must be boolean; batteryPercent finite number 0..100; rssi integer -120..0. JSON payload limit is 8 KiB for telemetry; authenticated device traffic is capped at 120 requests/minute per process. Restarting the service resets these in-memory limits; device deduplication lives in the database and persists.
 
-Sessions last 7 days, are signed, HttpOnly, SameSite=Strict and Secure in production. Password or SESSION_SECRET rotation invalidates old sessions. Logout clears the browser cookie; this MVP does not maintain per-session server revocation. Host/origin checks and a custom header protect dashboard mutations against cross-site requests. No permissive CORS is needed for ESP32. Render terminates HTTPS and forwards to the Node listener.
+Dashboard access is public, including its existing editing actions. APP_PASSWORD and SESSION_SECRET are unused; legacy cookies do not grant or restrict access. Host/origin checks, request headers and revision checks remain. IoT telemetry still requires its dedicated Bearer key. Database tokens are backend-only. Render terminates HTTPS and forwards to the Node listener.
